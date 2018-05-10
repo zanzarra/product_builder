@@ -1,0 +1,18 @@
+# Product builder routing definition
+
+entity.product_builder.canonical:
+  route_name: entity.product_builder.canonical
+  base_route: entity.product_builder.canonical
+  title: 'View'
+
+entity.product_builder.edit_form:
+  route_name: entity.product_builder.edit_form
+  base_route: entity.product_builder.canonical
+  title: 'Edit'
+
+entity.product_builder.delete_form:
+  route_name:  entity.product_builder.delete_form
+  base_route:  entity.product_builder.canonical
+  title: Delete
+  weight: 10
+

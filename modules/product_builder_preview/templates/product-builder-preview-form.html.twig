@@ -1,0 +1,20 @@
+{#
+/**
+ * @file
+ * Theme override for a 'form' element.
+ *
+ * Available variables
+ * - attributes: A list of HTML attributes for the wrapper element.
+ * - children: The child elements of the form.
+ *
+ * @see template_preprocess_form()
+ */
+#}
+<form{{ attributes }}>
+  <div>
+    {{ children }}
+  </div>
+  <div>
+    {{ field_leaflet_bbox_test }}
+  </div>
+</form>

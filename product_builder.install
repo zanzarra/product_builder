@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the Product Builder module.
+ */
+
+use Drupal\Core\Field\BaseFieldDefinition;
+
+/**
+ * Implements hook_install().
+ */
+function product_builder_install() {
+  $definition_update_manager = \Drupal::entityDefinitionUpdateManager();
+
+  $field_name = 'product_builder_id';
+  $entity_type_id = 'commerce_order_item';
+  $definition = BaseFieldDefinition::create('entity_reference')
+    ->setLabel(t('Product Builder entity'))
+    ->setDescription(t('The product builder entity.'))
+    ->setSetting('target_type', 'product_builder')
+    ->setSetting('handler', 'default')
+    ->setTargetEntityTypeId('commerce_order_item')
+    ->setName('product_builder_id')
+    ->setDefaultValue(NULL);
+
+  $definition_update_manager
+    ->installFieldStorageDefinition($field_name, $entity_type_id, $entity_type_id, $definition);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function product_builder_uninstall() {
+  $entity_definition_update_manager = \Drupal::entityDefinitionUpdateManager();
+
+  if ($entity_definition_update_manager->getEntityType('commerce_order_item')) {
+    $storage_definition = $entity_definition_update_manager->getFieldStorageDefinition('product_builder_id', 'commerce_order_item');
+    if ($storage_definition) {
+      $entity_definition_update_manager->uninstallFieldStorageDefinition($storage_definition);
+    }
+  }
+}

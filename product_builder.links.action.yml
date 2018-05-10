@@ -1,0 +1,11 @@
+entity.product_builder.add_form:
+  route_name: entity.product_builder.add_page
+  title: 'Add Product builder'
+  appears_on:
+    - entity.product_builder.collection
+entity.product_builder_type.add_form:
+  route_name: entity.product_builder_type.add_form
+  title: 'Add Product builder type'
+  appears_on:
+    - entity.product_builder_type.collection
+

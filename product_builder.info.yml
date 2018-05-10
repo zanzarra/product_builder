@@ -1,0 +1,9 @@
+name: 'Product Builder'
+type: module
+description: 'Product Builder'
+core: 8.x
+package: Product Builder
+dependencies:
+  - commerce:commerce
+  - commerce:commerce_product
+  - commerce:commerce_cart

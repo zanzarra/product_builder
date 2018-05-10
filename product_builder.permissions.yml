@@ -1,0 +1,19 @@
+add product builder entities:
+  title: 'Create new Product builder entities'
+
+administer product builder entities:
+  title: 'Administer Product builder entities'
+  description: 'Allow to access the administration form to configure Product builder entities.'
+  restrict access: true
+
+delete product builder entities:
+  title: 'Delete Product builder entities'
+
+edit product builder entities:
+  title: 'Edit Product builder entities'
+
+view published product builder entities:
+  title: 'View published Product builder entities'
+
+view unpublished product builder entities:
+  title: 'View unpublished Product builder entities'

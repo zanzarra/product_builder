@@ -1,0 +1,18 @@
+
+# Product builder menu items definition
+entity.product_builder.collection:
+  title: 'Product builder list'
+  route_name: entity.product_builder.collection
+  description: 'List Product builder entities'
+  parent: system.admin_structure
+  weight: 100
+
+
+# Product builder type menu items definition
+entity.product_builder_type.collection:
+  title: 'Product builder type'
+  route_name: entity.product_builder_type.collection
+  description: 'List Product builder type (bundles)'
+  parent: system.admin_structure
+  weight: 99
+

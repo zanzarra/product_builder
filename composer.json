@@ -1,0 +1,14 @@
+{
+  "name": "drupal/product_builder",
+  "type": "drupal-module",
+  "description": "Product Builder",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0+",
+  "homepage": "https://www.drupal.org/project/product_builder",
+  "minimum-stability": "dev",
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/product_builder",
+    "source": "http://cgit.drupalcode.org/product_builder"
+  },
+  "require": { }
+}

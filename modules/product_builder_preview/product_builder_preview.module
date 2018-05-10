@@ -1,0 +1,161 @@
+<?php
+
+/**
+ * @file
+ * Contains product_builder_preview.module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_theme().
+ */
+function product_builder_preview_theme() {
+  return [
+    'product_builder_preview_form' => [
+      'render element' => 'element',
+      'preprocess functions' => [
+        'template_preprocess_form',
+        'template_preprocess_product_builder_preview_form'
+      ],
+    ],
+  ];
+}
+
+/**
+ * Preprocess function for product_builder_preview_form theme.
+ */
+function template_preprocess_product_builder_preview_form(&$variables) {
+  $element = $variables['element'];
+
+  $suggestions = product_builder_preview_suggestions_list();
+
+  $template_variables = product_builder_preview_get_suggestion_template_variables($suggestions);
+  foreach ($template_variables as $variable_name) {
+    $variables[$variable_name] = $element["#$variable_name"];
+  }
+}
+
+/**
+ * Implements hook_theme_suggestions_HOOK_alter().
+ */
+function product_builder_preview_theme_suggestions_form_alter(array &$suggestions, array $variables, $hook) {
+  if ($hook == 'form') {
+    if (isset($variables['element']['#entity_type']) && ($variables['element']['#entity_type'] == 'product_builder')) {
+      $suggestions += product_builder_preview_suggestions_list();
+    }
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function product_builder_preview_form_alter(&$form, FormStateInterface &$form_state, $form_id) {
+  $form_builder = $form_state->getBuildInfo();
+  if (isset($form_builder['base_form_id']) && ($form_builder['base_form_id'] == 'product_builder_form')) {
+    $form['#pre_render'][] = 'product_builder_preview_product_builder_form_pre_render';
+  }
+}
+
+/**
+ * Pre render callback for product builder entity form.
+ */
+function product_builder_preview_product_builder_form_pre_render($elements) {
+
+  //Default variables in template
+  $default_variables = [
+    'attributes' => 'attributes',
+    'children' => 'children',
+  ];
+
+  $suggestions = product_builder_preview_suggestions_list();
+
+  $template_variables = product_builder_preview_get_suggestion_template_variables($suggestions);
+
+  foreach ($template_variables as $variable_name) {
+    if (isset($default_variables[$variable_name])) {
+      continue;
+    }
+
+    $elements["#$variable_name"] = $elements[$variable_name];
+    unset($elements[$variable_name]);
+  }
+
+  return $elements;
+}
+
+/**
+ * Return product builder preview suggestions list.
+ */
+function product_builder_preview_suggestions_list() {
+  return [
+    'product_builder_preview_form',
+  ];
+}
+
+/**
+ * Get templates variables for suggestions list.
+ */
+function product_builder_preview_get_suggestion_template_variables($suggestions) {
+  if (!$suggestions) {
+    return [];
+  }
+
+  $variables = &drupal_static(__FUNCTION__, []);
+
+  $theme_registry = \Drupal::service('theme.registry');
+  $theme_registry = $theme_registry->getRuntime();
+  foreach (array_reverse($suggestions) as $suggestion) {
+    if ($theme_registry->has($suggestion)) {
+      $info = $theme_registry->get($suggestion);
+      break;
+    }
+  }
+
+  if (isset($variables[$suggestion])) {
+    return $variables[$suggestion];
+  }
+
+  $variables[$suggestion] = [];
+
+  if (isset($info)) {
+    $extension = '.html.twig';
+    $template_file = $info['template'] . $extension;
+    if (isset($info['path'])) {
+      $template_file = $info['path'] . '/' . $template_file;
+    }
+
+    $twig_service = \Drupal::service('twig');
+    $loader = \Drupal::service('twig.loader.filesystem');
+    $parsed = $twig_service->parse($twig_service->tokenize($loader->getSource($template_file)));
+    $variables[$suggestion] = product_builder_preview_get_twig_variable_names($parsed);
+  }
+
+  return $variables[$suggestion];
+}
+
+/**
+ * Get twig template variables names.
+ */
+function product_builder_preview_get_twig_variable_names($nodes) {
+  $variables = [];
+  foreach ($nodes as $node) {
+    if ($node instanceof \Twig_Node_Expression_Name) {
+      $name = $node->getAttribute('name');
+      $variables[$name] = $name;
+    } elseif ($node instanceof \Twig_Node_Expression_Constant && $nodes instanceof \Twig_Node_Expression_GetAttr) {
+      $value = $node->getAttribute('value');
+      if (!empty($value) && is_string($value)) {
+        $variables[$value] = $value;
+      }
+    } elseif ($node instanceof \Twig_Node_Expression_GetAttr) {
+      $path = implode('.', product_builder_preview_get_twig_variable_names($node));
+      if (!empty($path)) {
+        $variables[$path] = $path;
+      }
+    } elseif ($node instanceof \Twig_Node) {
+      $variables += product_builder_preview_get_twig_variable_names($node);
+    }
+  }
+  return $variables;
+}
