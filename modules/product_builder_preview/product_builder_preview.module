@@ -12,38 +12,24 @@ use Drupal\Core\Form\FormStateInterface;
  */
 function product_builder_preview_theme() {
   return [
-    'product_builder_preview_form' => [
+    'product_builder_preview_element' => [
       'render element' => 'element',
-      'preprocess functions' => [
-        'template_preprocess_form',
-        'template_preprocess_product_builder_preview_form'
-      ],
     ],
   ];
 }
 
 /**
- * Preprocess function for product_builder_preview_form theme.
+ * Implements template_preprocess_HOOK().
  */
-function template_preprocess_product_builder_preview_form(&$variables) {
+function template_preprocess_product_builder_preview_element(&$variables) {
   $element = $variables['element'];
 
   $suggestions = product_builder_preview_suggestions_list();
+  $template_file = product_builder_preview_get_suggestion_template($suggestions);
+  $template_variables = product_builder_preview_get_template_variables($template_file);
 
-  $template_variables = product_builder_preview_get_suggestion_template_variables($suggestions);
   foreach ($template_variables as $variable_name) {
     $variables[$variable_name] = $element["#$variable_name"];
-  }
-}
-
-/**
- * Implements hook_theme_suggestions_HOOK_alter().
- */
-function product_builder_preview_theme_suggestions_form_alter(array &$suggestions, array $variables, $hook) {
-  if ($hook == 'form') {
-    if (isset($variables['element']['#entity_type']) && ($variables['element']['#entity_type'] == 'product_builder')) {
-      $suggestions += product_builder_preview_suggestions_list();
-    }
   }
 }
 
@@ -62,22 +48,23 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
  */
 function product_builder_preview_product_builder_form_pre_render($elements) {
 
-  //Default variables in template
-  $default_variables = [
-    'attributes' => 'attributes',
-    'children' => 'children',
-  ];
-
   $suggestions = product_builder_preview_suggestions_list();
-
-  $template_variables = product_builder_preview_get_suggestion_template_variables($suggestions);
+  $template_file = product_builder_preview_get_suggestion_template($suggestions);
+  $template_variables = product_builder_preview_get_template_variables($template_file);
 
   foreach ($template_variables as $variable_name) {
     if (isset($default_variables[$variable_name])) {
       continue;
     }
 
-    $elements["#$variable_name"] = $elements[$variable_name];
+    if (!isset($elements['product_builder_preview_element'])) {
+      $elements['product_builder_preview_element'] = [
+        '#theme' => 'product_builder_preview_element',
+        '#weight' => 100,
+      ];
+    }
+
+    $elements['product_builder_preview_element']["#$variable_name"] = $elements[$variable_name];
     unset($elements[$variable_name]);
   }
 
@@ -89,20 +76,33 @@ function product_builder_preview_product_builder_form_pre_render($elements) {
  */
 function product_builder_preview_suggestions_list() {
   return [
-    'product_builder_preview_form',
+    'product_builder_preview_element',
   ];
 }
 
 /**
- * Get templates variables for suggestions list.
+ * Get templates variables for template.
  */
-function product_builder_preview_get_suggestion_template_variables($suggestions) {
-  if (!$suggestions) {
-    return [];
-  }
+function product_builder_preview_get_template_variables($template_file) {
 
   $variables = &drupal_static(__FUNCTION__, []);
 
+  if (isset($variables[$template_file])) {
+    return $variables[$template_file];
+  }
+
+  $twig_service = \Drupal::service('twig');
+  $loader = \Drupal::service('twig.loader.filesystem');
+  $parsed = $twig_service->parse($twig_service->tokenize($loader->getSource($template_file)));
+  $variables[$template_file] = product_builder_preview_get_twig_variable_names($parsed);
+
+  return $variables[$template_file];
+}
+
+/**
+ * Get template for suggestions list.
+ */
+function product_builder_preview_get_suggestion_template($suggestions) {
   $theme_registry = \Drupal::service('theme.registry');
   $theme_registry = $theme_registry->getRuntime();
   foreach (array_reverse($suggestions) as $suggestion) {
@@ -112,26 +112,13 @@ function product_builder_preview_get_suggestion_template_variables($suggestions)
     }
   }
 
-  if (isset($variables[$suggestion])) {
-    return $variables[$suggestion];
+  $extension = '.html.twig';
+  $template_file = $info['template'] . $extension;
+  if (isset($info['path'])) {
+    $template_file = $info['path'] . '/' . $template_file;
   }
 
-  $variables[$suggestion] = [];
-
-  if (isset($info)) {
-    $extension = '.html.twig';
-    $template_file = $info['template'] . $extension;
-    if (isset($info['path'])) {
-      $template_file = $info['path'] . '/' . $template_file;
-    }
-
-    $twig_service = \Drupal::service('twig');
-    $loader = \Drupal::service('twig.loader.filesystem');
-    $parsed = $twig_service->parse($twig_service->tokenize($loader->getSource($template_file)));
-    $variables[$suggestion] = product_builder_preview_get_twig_variable_names($parsed);
-  }
-
-  return $variables[$suggestion];
+  return $template_file;
 }
 
 /**
@@ -157,5 +144,6 @@ function product_builder_preview_get_twig_variable_names($nodes) {
       $variables += product_builder_preview_get_twig_variable_names($node);
     }
   }
+
   return $variables;
 }

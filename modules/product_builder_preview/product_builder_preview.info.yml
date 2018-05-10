@@ -2,6 +2,6 @@ name: 'Product Builder Preview'
 type: module
 description: 'Product Builder Preview'
 core: 8.x
-package: 'Custom'
+package: Product Builder
 dependencies:
   - drupal:product_builder
