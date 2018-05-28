@@ -10,6 +10,9 @@
  * @see template_preprocess_form()
  */
 #}
-<div>
+<div id="product-builder-preview">
   {{ field_leaflet_bbox_test }}
+  {{ state_variables.variation.attribute_color.name }}
+  {{ state_variables.variation.attribute_size.name }}
+  {{ dump(state_variables) }}
 </div>
