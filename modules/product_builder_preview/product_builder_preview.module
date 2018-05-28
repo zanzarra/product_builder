@@ -1,4 +1,4 @@
-<?php
+  <?php
 
 /**
  * @file
@@ -71,10 +71,56 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
       unset($form[$variable_name]);
     }
 
-    foreach (Element::children($form['purchased_entity']['widget'][0]['attributes']) as $key) {
-      $form['purchased_entity']['widget'][0]['attributes'][$key]['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+
+    // Hardcoded AJAX callback for one textfield form.
+    // @todo LA: rework this to apply AJAX callback intelligently, depending on form element type.
+    $form = product_builder_preview_add_ajax_callback_recursively($form, 'product_builder_preview_ajax_preview_rebuild_callback');
+
+    foreach (Element::children($form) as $key) {
+      $form[$key]['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+    }
+
+    //@todo move to product_builder_preview_add_ajax_callback_recursively().
+//    if (isset($form['purchased_entity']['widget'][0]['attributes'])) {
+      foreach (Element::children($form['purchased_entity']['widget'][0]['attributes']) as $key) {
+        $form['purchased_entity']['widget'][0]['attributes'][$key]['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+      }
+//    }
+  }
+}
+
+  /**
+   * Applies AJAX callback recursively to the form elements.
+   *
+   * @param array $el
+   *   FAPI element
+   *
+   * @param string $callback
+   *   AJAX callback function name.
+   *
+   * @return array
+   *   Processed FAPI element.
+   */
+function product_builder_preview_add_ajax_callback_recursively($el, $callback) {
+  //@todo move this to kind of info hook. Probably should contain triggering events as well.
+  $types_mapping = [
+    'textfield' => 'change',
+  ];
+
+  foreach (Element::children($el) as $key) {
+    $children = Element::children($el[$key]);
+    if ($children) {
+      $el[$key] = product_builder_preview_add_ajax_callback_recursively($el[$key], $callback);
+    }
+
+    if (array_key_exists('#type', $el[$key]) && array_key_exists($el[$key]['#type'], $types_mapping)) {
+      $el[$key]['#ajax']['callback'] = $callback;
+      $el[$key]['#ajax']['event'] = $types_mapping[$el[$key]['#type']];
+      $el[$key]['#ajax']['disable-refocus'] = TRUE;
     }
   }
+
+  return $el;
 }
 
 /**
@@ -87,19 +133,20 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
 
   //Ajax response that refresh variation widget
   //@todo When ajax is added to no attributes field add correct condition
-  if (TRUE) {
-    $original_view_mode = $form_state->get('view_mode');
-    $form_state->set('view_mode', 'full');
-    //actual attachments are added inside this method
-    $ajax_response = ProductVariationAttributesWidget::ajaxRefresh($form, $form_state);
-    $form_state->get('view_mode', $original_view_mode);
-  }
-  else {
+  // Check if there is a product attribtues widget in a form.
+//  if (isset($form['purchased_entity']['widget'][0]['attributes'])) {
+//    $original_view_mode = $form_state->get('view_mode');
+//    $form_state->set('view_mode', 'full');
+//    //actual attachments are added inside this method
+//    $ajax_response = ProductVariationAttributesWidget::ajaxRefresh($form, $form_state);
+//    $form_state->get('view_mode', $original_view_mode);
+//  }
+//  else {
     $ajax_response = new AjaxResponse();
     //Attach actual attachments
     $attachments = product_builder_preview_get_form_attachments($form);
     $ajax_response->setAttachments($attachments);
-  }
+//  }
 
   $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['product_builder_preview_element'])));
 
