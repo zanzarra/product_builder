@@ -1,4 +1,4 @@
-  <?php
+<?php
 
 /**
  * @file
@@ -11,6 +11,7 @@ use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\SettingsCommand;
 use Drupal\commerce_product\Plugin\Field\FieldWidget\ProductVariationAttributesWidget;
+use Drupal\Core\Entity\Entity\EntityViewDisplay;
 
 /**
  * Implements hook_theme().
@@ -54,57 +55,117 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
     $template_file = product_builder_preview_get_suggestion_template($suggestions);
     $template_variables = product_builder_preview_get_template_variables($template_file);
 
+    $form['product_builder_preview_element'] = [
+      '#theme' => 'product_builder_preview_element',
+      '#weight' => 100,
+      '#state_variables' => product_builder_preview_get_preview_state_variables($form_state)
+    ];
+
     foreach ($template_variables as $variable_name) {
       if (strpos($variable_name, 'state_variables') !== FALSE) {
         continue;
       }
 
-      if (!isset($form['product_builder_preview_element'])) {
-        $form['product_builder_preview_element'] = [
-          '#theme' => 'product_builder_preview_element',
-          '#weight' => 100,
-        ];
-      }
-
-      $form['product_builder_preview_element']['#state_variables'] = product_builder_preview_get_preview_state_variables($form_state);
       $form['product_builder_preview_element']["#$variable_name"] = $form[$variable_name];
       unset($form[$variable_name]);
     }
 
-
     // Hardcoded AJAX callback for one textfield form.
-    // @todo LA: rework this to apply AJAX callback intelligently, depending on form element type.
     $form = product_builder_preview_add_ajax_callback_recursively($form, 'product_builder_preview_ajax_preview_rebuild_callback');
+  }
 
-    foreach (Element::children($form) as $key) {
-      $form[$key]['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
-    }
+  //Added template variables list
+  if (($form_id == 'entity_form_display_edit_form') || ($form_id == 'entity_view_display_edit_form')) {
+    $entity = $form_builder['callback_object']->getEntity();
+    $entity_type = $entity->getTargetEntityTypeId();
+    $bundle = $entity->getTargetBundle();
 
-    //@todo move to product_builder_preview_add_ajax_callback_recursively().
-//    if (isset($form['purchased_entity']['widget'][0]['attributes'])) {
-      foreach (Element::children($form['purchased_entity']['widget'][0]['attributes']) as $key) {
-        $form['purchased_entity']['widget'][0]['attributes'][$key]['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+    if ($entity_type == 'product_builder') {
+      $entity = \Drupal::entityTypeManager()->getStorage($entity_type)->create(['type' => $bundle]);
+      $data = product_builder_preview_entity_get_prepared_fields($entity);
+
+      if ($variation_type = product_builder_preview_get_builder_variation_type($bundle)) {
+        $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->create(['type' => $variation_type]);
+        $data['variation'] = product_builder_preview_entity_get_prepared_fields($variation);
       }
-//    }
+
+      $form['product_builder_state_variables'] = [
+        '#title' => t('Product Builder Variables'),
+        '#type' => 'details',
+        '#open' => FALSE,
+      ];
+      $form['product_builder_state_variables']['state_variables'] = [
+        '#theme' => 'item_list',
+        '#list_type' => 'ul',
+        '#items' => product_builder_preview_prepared_fields_list($data, 'state_variables'),
+      ];
+    }
   }
 }
 
-  /**
-   * Applies AJAX callback recursively to the form elements.
-   *
-   * @param array $el
-   *   FAPI element
-   *
-   * @param string $callback
-   *   AJAX callback function name.
-   *
-   * @return array
-   *   Processed FAPI element.
-   */
+/**
+ * Return variation type which uses product builder by bundle.
+ *
+ * @param string $bundle
+ *   Bundle name.
+ *
+ * @return mixed
+ */
+function product_builder_preview_get_builder_variation_type($bundle) {
+  $product_types = \Drupal::service('entity.manager')->getStorage('commerce_product_type')->loadMultiple();
+  foreach ($product_types as $name => $product_type) {
+    $variations_formatter = EntityViewDisplay::load('commerce_product.' . $name . '.default')->getRenderer('variations');
+    if (($variations_formatter->getPluginId() == 'product_builder_add_to_cart') && ($variations_formatter->getSetting('builder_bundle') == $bundle)) {
+      return $product_type->getVariationTypeId();
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Return list of prepared fields.
+ *
+ * @param array $data
+ *   Prepared fields array.
+ *
+ * @param string $line
+ *   Prefix line.
+ *
+ * @return array
+ */
+function product_builder_preview_prepared_fields_list($data, $line = '') {
+  $list = [];
+  foreach ($data as $key => $element) {
+    $list[] = "$line.$key";
+    if (is_array($element)) {
+      $list = array_merge($list, product_builder_preview_prepared_fields_list($element, "$line.$key"));
+    }
+  }
+
+  return $list;
+}
+
+/**
+ * Applies AJAX callback recursively to the form elements.
+ *
+ * @param array $el
+ *   FAPI element
+ *
+ * @param string $callback
+ *   AJAX callback function name.
+ *
+ * @return array
+ *   Processed FAPI element.
+ */
 function product_builder_preview_add_ajax_callback_recursively($el, $callback) {
   //@todo move this to kind of info hook. Probably should contain triggering events as well.
   $types_mapping = [
     'textfield' => 'change',
+    'select' => 'change',
+    'radios' => 'change',
+    'checkboxes' => 'change',
+    'checkbox' => 'change'
   ];
 
   foreach (Element::children($el) as $key) {
@@ -127,28 +188,22 @@ function product_builder_preview_add_ajax_callback_recursively($el, $callback) {
  * Ajax callback for refresh product builder preview.
  */
 function product_builder_preview_ajax_preview_rebuild_callback(array $form, FormStateInterface $form_state) {
-
-  $form_builder = \Drupal::service('form_builder');
-  $form = $form_builder->rebuildForm('product_builder_map_builder_add_form', $form_state, $form);
-
-  //Ajax response that refresh variation widget
-  //@todo When ajax is added to no attributes field add correct condition
-  // Check if there is a product attribtues widget in a form.
-//  if (isset($form['purchased_entity']['widget'][0]['attributes'])) {
-//    $original_view_mode = $form_state->get('view_mode');
-//    $form_state->set('view_mode', 'full');
-//    //actual attachments are added inside this method
-//    $ajax_response = ProductVariationAttributesWidget::ajaxRefresh($form, $form_state);
-//    $form_state->get('view_mode', $original_view_mode);
-//  }
-//  else {
+  $triggering_element = $form_state->getTriggeringElement();
+  if (isset($triggering_element['#attributes']['data-variation-attribute'])) {
+    $original_view_mode = $form_state->get('view_mode');
+    $form_state->set('view_mode', 'full');
+    //actual attachments are added inside this method
+    $ajax_response = ProductVariationAttributesWidget::ajaxRefresh($form, $form_state);
+    $form_state->get('view_mode', $original_view_mode);
+  }
+  else {
     $ajax_response = new AjaxResponse();
     //Attach actual attachments
     $attachments = product_builder_preview_get_form_attachments($form);
     $ajax_response->setAttachments($attachments);
-//  }
 
-  $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['product_builder_preview_element'])));
+    $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['product_builder_preview_element'])));
+  }
 
   return $ajax_response;
 }
@@ -250,15 +305,16 @@ function product_builder_preview_get_preview_state_variables($form_state) {
 
   $prepared_values = product_builder_preview_entity_get_prepared_fields($entity, $state_values);
 
-  if (isset($state_values['purchased_entity'][0]['variation'])) {
-    $prepared_values['variation'] = product_builder_preview_prepared_values($state_values['purchased_entity'][0]['variation']);
-  }
-  else {
-    $prepared_values['variation'] = \Drupal::request()->query->get('variation_id');
+  if (($variation_id = $form_state->get('selected_variation')) || ($variation_id = \Drupal::request()->query->get('variation_id'))) {
+    $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
   }
 
-  if ($entity = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($prepared_values['variation'])) {
-    $prepared_values['variation'] = product_builder_preview_entity_get_prepared_fields($entity);
+  if (empty($variation) && ($variation_type = product_builder_preview_get_builder_variation_type($entity->bundle()))) {
+    $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->create(['type' => $variation_type]);
+  }
+
+  if ($variation) {
+    $prepared_values['variation'] = product_builder_preview_entity_get_prepared_fields($variation);
   }
 
   return $prepared_values;
@@ -333,6 +389,14 @@ function product_builder_preview_entity_get_prepared_fields($entity, $state_valu
     $type = $field_definition->getType();
     $cardinality = product_builder_preview_get_field_cardinality($field_definition);
 
+    $template_variables_manager = \Drupal::service('plugin.manager.builder_variables_plugin');
+    $template_variables_fields = $template_variables_manager->getDefinitions();
+    if (!isset($template_variables_fields[$type])) {
+      continue;
+    }
+
+    $template_variables = $template_variables_manager->createInstance($type);
+    $template_variables->setFieldDefinition($field_definition);
     //Write value from form_state values
     if (isset($state_values[$name])) {
       $values[$name] = $state_values[$name];
@@ -343,31 +407,16 @@ function product_builder_preview_entity_get_prepared_fields($entity, $state_valu
 
     if ($cardinality === 1) {
       $values[$name] = product_builder_preview_prepared_values($values[$name]);
-
-      if ($type == 'entity_reference') {
-        $entity_type = $field_definition->getSetting('target_type');
-
-        $entity = \Drupal::entityTypeManager()->getStorage($entity_type)->load($values[$name]);
-        if (method_exists($entity, 'getFields')) {
-          $values[$name] = product_builder_preview_entity_get_prepared_fields($entity);
-        }
-
+      $values[$name] = $template_variables->prepare($values[$name]);
+    }
+    elseif ($values[$name]) {
+      foreach ($values[$name] as $key => $value) {
+        $values[$name][$key] = product_builder_preview_prepared_values($value);
+        $values[$name][$key] = $template_variables->prepare($values[$name][$key]);
       }
     }
     else {
-      foreach ($values[$name] as $key => $value) {
-        $values[$name][$key] = product_builder_preview_prepared_values($value);
-
-        if ($type == 'entity_reference') {
-          $entity_type = $field_definition->getSetting('target_type');
-
-          $entity = \Drupal::entityTypeManager()->getStorage($entity_type)->load($values[$name][$key]);
-          if (method_exists($entity, 'getFields')) {
-            $values[$name][$key]= product_builder_preview_entity_get_prepared_fields($entity);
-          }
-
-        }
-      }
+      $values[$name][0] = $template_variables->prepare('');
     }
 
   }

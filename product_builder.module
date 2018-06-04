@@ -9,6 +9,7 @@ use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\Element;
 
 /**
  * Implements hook_help().
@@ -119,14 +120,45 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
       $product = $variation->getProduct();
 
+      //Set default variation id
+      //See ProductVariationStorage class loadFromContext method
+      $request_stack = \Drupal::service('request_stack');
+      $current_request = $request_stack->getCurrentRequest();
+      $current_request->query->set('v', $variation_id);
+
+      //@todo If there is not complete match commerce use default variation
+      //@todo This bug exists in default product form.
+      //See ProductVariationAttributesWidget class selectVariationFromUserInput method.
+      //This code get variation with max match count and set triggered attribute as base.
+      $triggering_element = $form_state->getTriggeringElement();
+      if (isset($triggering_element['#attributes']['data-variation-attribute'])) {
+        $parents = [$field_name, 0];
+        $user_input = $form_state->getUserInput();
+        $attribute_user_input = (array) NestedArray::getValue($user_input, $parents);
+        $attribute = $triggering_element['#attributes']['data-variation-attribute'];
+        $current_variation = product_builder_select_variation_from_user_input($product, $attribute_user_input, $attribute);
+
+        foreach ($attribute_user_input['attributes'] as $attribute_name => $value) {
+          $attribute_user_input['attributes'][$attribute_name] = $current_variation->getAttributeValueId($attribute_name);
+        }
+        NestedArray::setValue($user_input, $parents, $attribute_user_input);
+        $form_state->setUserInput($user_input);
+      }
+
       $form_state->setFormState(['product' => $product]);
 
       $order_item = $order_item_storage->createFromPurchasableEntity($variation);;
 
+      //Create product variation widget
       $items = $order_item->get($field_name);
       $items->filterEmptyItems();
       $form[$field_name] = $widget->form($items, $form, $form_state);
       $form[$field_name]['#access'] = $items->access('edit');
+
+      //Add data attribute for variation attributes fields.
+      foreach (Element::children($form[$field_name]['widget'][0]['attributes']) as $key) {
+        $form[$field_name]['widget'][0]['attributes'][$key]['#attributes']['data-variation-attribute'] = $key;
+      }
 
       // Assign the correct weight. This duplicates the reordering done in
       // processForm(), but is needed for other forms calling this method
@@ -153,9 +185,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
 function product_builder_commerce_add_to_cart($form, FormStateInterface $form_state) {
 
   $product = $form_state->get('product');
-  $parents = ['purchased_entity', 0];
-  $user_input = (array) NestedArray::getValue($form_state->getUserInput(), $parents);
-  $selected_variation = product_builder_select_variation_from_user_input($product, $user_input);
+  $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($form_state->get('selected_variation'));
 
   //@todo probably there is better way
   //Get store
@@ -206,25 +236,28 @@ function product_builder_add_to_cart_builder_form_redirect($form, FormStateInter
 }
 
 /**
- * Get selected variation.
+ * Get selected variation use default attribute as base and get max count match variation.
  * See ProductVariationAttributesWidget class selectVariationFromUserInput method.
  */
-function product_builder_select_variation_from_user_input($product, $user_input) {
+function product_builder_select_variation_from_user_input($product, &$user_input, $attribute) {
   $variations = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->loadEnabled($product);
 
   $current_variation = reset($variations);
   if (!empty($user_input['attributes'])) {
-    $attributes = $user_input['attributes'];
+    $previous = 0;
     foreach ($variations as $variation) {
-      $match = TRUE;
-      foreach ($attributes as $field_name => $value) {
-        if ($variation->getAttributeValueId($field_name) != $value) {
-          $match = FALSE;
+      if ($variation->getAttributeValueId($attribute) != $user_input['attributes'][$attribute]) {
+        continue;
+      }
+      $match = 0;
+      foreach ($user_input['attributes'] as $field_name => $value) {
+        if ($variation->getAttributeValueId($field_name) == $value) {
+          $match++;
         }
       }
-      if ($match) {
+      if ($match > $previous) {
         $current_variation = $variation;
-        break;
+        $previous = $match;
       }
     }
   }

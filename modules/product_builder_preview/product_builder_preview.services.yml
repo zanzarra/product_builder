@@ -1,0 +1,4 @@
+services:
+  plugin.manager.builder_variables_plugin:
+    class: Drupal\product_builder_preview\Plugin\BuilderVariablesPluginManager
+    parent: default_plugin_manager
