@@ -51,7 +51,7 @@ use Drupal\user\UserInterface;
  *   links = {
  *     "canonical" = "/admin/structure/product_builder/{product_builder}",
  *     "add-page" = "/admin/structure/product_builder/add",
- *     "add-form" = "/admin/structure/product_builder/add/{product_builder_type}",
+ *     "add-form" = "/product_builder/add/{product_builder_type}",
  *     "edit-form" = "/admin/structure/product_builder/{product_builder}/edit",
  *     "delete-form" = "/admin/structure/product_builder/{product_builder}/delete",
  *     "collection" = "/admin/structure/product_builder",

@@ -39,7 +39,7 @@ function template_preprocess_product_builder_preview_element(&$variables) {
       continue;
     }
 
-    $variables[$variable_name] = $element["#$variable_name"];
+    $variables[$variable_name] = $element["$variable_name"];
   }
   $variables['state_variables'] = $element['#state_variables'];
 }
@@ -55,10 +55,31 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
     $template_file = product_builder_preview_get_suggestion_template($suggestions);
     $template_variables = product_builder_preview_get_template_variables($template_file);
 
-    $form['product_builder_preview_element'] = [
+    $form['pb-controls'] = [
+      '#attached' => [
+        'library' => ['product_builder_preview/layout'],
+      ],
+      '#attributes' => [
+        'class' => ['product-builder-controls'],
+      ],
+      '#title' => t('Controls'),
+      '#type' => 'fieldset',
+    ];
+
+    $form['pb-preview'] = [
+      '#attributes' => [
+        'class' => ['product-builder-preview'],
+      ],
+      '#title' => t('Preview'),
+      '#type' => 'fieldset',
+    ];
+
+    $form['pb-preview']['product_builder_preview_element'] = [
       '#theme' => 'product_builder_preview_element',
       '#weight' => 100,
-      '#state_variables' => product_builder_preview_get_preview_state_variables($form_state)
+      '#state_variables' => product_builder_preview_get_preview_state_variables($form_state),
+      '#prefix' => '<div id="product-builder-preview">',
+      '#suffix' => '</div>',
     ];
 
     foreach ($template_variables as $variable_name) {
@@ -66,8 +87,17 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
         continue;
       }
 
-      $form['product_builder_preview_element']["#$variable_name"] = $form[$variable_name];
-      unset($form[$variable_name]);
+      if (isset($form[$variable_name])) {
+        $form['pb-preview']['product_builder_preview_element']["$variable_name"] = $form[$variable_name];
+        unset($form[$variable_name]);
+      }
+    }
+
+    foreach (Element::children($form) as $child) {
+      if (($child != 'pb-controls') && ($child != 'pb-preview')) {
+        $form['pb-controls'][$child] = $form[$child];
+        unset($form[$child]);
+      }
     }
 
     // Hardcoded AJAX callback for one textfield form.
@@ -202,7 +232,7 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
     $attachments = product_builder_preview_get_form_attachments($form);
     $ajax_response->setAttachments($attachments);
 
-    $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['product_builder_preview_element'])));
+    $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['pb-preview']['product_builder_preview_element'])));
   }
 
   return $ajax_response;
@@ -422,4 +452,64 @@ function product_builder_preview_entity_get_prepared_fields($entity, $state_valu
   }
 
   return $values;
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function product_builder_preview_entity_extra_field_info() {
+  $extra = [];
+
+  $builder_types = \Drupal::entityTypeManager()->getStorage('product_builder_type')->loadMultiple();
+  foreach ($builder_types as $type) {
+    $extra['product_builder'][$type->id()]['display']['builder_preview'] = [
+      'label' => t('Builder Preview'),
+      'description' => t('Rendered Product Builder'),
+      'weight' => 50,
+    ];
+  }
+
+  return $extra;
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function product_builder_preview_entity_view(&$build, $entity, $display, $view_mode) {
+  if ($display->getComponent('builder_preview')) {
+    $prepared_values = product_builder_preview_entity_get_prepared_fields($entity);
+
+    if ($variation_id = product_builder_get_builder_commerce_item($entity->id())) {
+      $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
+    }
+
+    if (empty($variation) && ($variation_type = product_builder_preview_get_builder_variation_type($entity->bundle()))) {
+      $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->create(['type' => $variation_type]);
+    }
+
+    if ($variation) {
+      $prepared_values['variation'] = product_builder_preview_entity_get_prepared_fields($variation);
+    }
+
+    $build['builder_preview'] = [
+      '#theme' => 'product_builder_preview_element',
+      '#state_variables' => $prepared_values
+    ];
+
+    $suggestions = product_builder_preview_suggestions_list();
+    $template_file = product_builder_preview_get_suggestion_template($suggestions);
+    $template_variables = product_builder_preview_get_template_variables($template_file);
+
+    $form_object = \Drupal::entityTypeManager()->getFormObject('product_builder', 'edit');
+    $form_object->setEntity($entity);
+    $form = \Drupal::formBuilder()->getForm($form_object, []);
+
+    foreach ($template_variables as $variable_name) {
+      if (strpos($variable_name, 'state_variables') !== FALSE) {
+        continue;
+      }
+
+      $build['builder_preview']["$variable_name"] = $form['pb-preview']['product_builder_preview_element']["$variable_name"];
+    }
+  }
 }

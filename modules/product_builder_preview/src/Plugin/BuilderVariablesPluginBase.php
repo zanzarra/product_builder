@@ -55,6 +55,10 @@ abstract class BuilderVariablesPluginBase extends PluginBase implements BuilderV
       return array_fill_keys($this->getFieldKeys(), '');
     }
     if (is_array($value)) {
+      if (count($this->getFieldKeys()) === 1) {
+        return isset($value[$this->getFieldKeys()[0]]) ? $value[$this->getFieldKeys()[0]] : '';
+      }
+
       return array_intersect_key($value, array_fill_keys($this->getFieldKeys(), ''));
     }
 

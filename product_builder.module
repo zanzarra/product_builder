@@ -92,7 +92,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
   if (isset($form_builder['base_form_id']) && ($form_builder['base_form_id'] == 'product_builder_form')) {
     //Add Attributes form to product builder form
     //See Class EntityFormDisplay method buildForm
-    if ($variation_id = $query = \Drupal::request()->query->get('variation_id')) {
+    if ($variation_id = \Drupal::request()->query->get('variation_id')) {
       $configuration = [
         'type' => 'commerce_product_variation_attributes',
         'weight' => 0,
@@ -263,4 +263,20 @@ function product_builder_select_variation_from_user_input($product, &$user_input
   }
 
   return $current_variation;
+}
+
+/**
+ * Get variation id for product builder entity.
+ *
+ * @param $id
+ *   Product builder entity id.
+ *
+ * @return mixed
+ */
+function product_builder_get_builder_commerce_item($id) {
+  $q = \Drupal::database()->select('commerce_order_item', 'coi');
+  $q->addField('coi', 'purchased_entity');
+  $q->condition('coi.product_builder_id', $id);
+
+  return $q->execute()->fetchField();
 }

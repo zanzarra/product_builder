@@ -1,0 +1,14 @@
+.product-builder-controls {
+  float: left;
+  width: 300px;
+}
+.product-builder-preview {
+  float: right;
+  width: calc(100% - 300px - 4em);
+}
+#product-builder-preview .pizza-name {
+  margin: 0 auto .5em;
+}
+#product-builder-preview .pizza-base {
+  margin: 0 auto .5em;
+}

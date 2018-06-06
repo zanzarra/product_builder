@@ -50,6 +50,7 @@ class EntityReferenceVariables extends BuilderVariablesPluginBase {
       return $prepared;
     }
 
+    $value = parent::prepare($value);
     $referenced_entity = \Drupal::entityTypeManager()->getStorage($entity_type)->load($value);
     if (method_exists($referenced_entity, 'getFields')) {
       return $prepared + product_builder_preview_entity_get_prepared_fields($referenced_entity);

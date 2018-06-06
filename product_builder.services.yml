@@ -2,3 +2,8 @@ services:
   product_builder.add_to_cart_lazy_builders:
     class: Drupal\product_builder\AddToCartProductBuilderLazyBuilders
     arguments: ['@entity_type.manager', '@form_builder', '@entity.repository']
+
+  product_builder.route_subscriber:
+    class: Drupal\product_builder\Routing\RouteSubscriber
+    tags:
+      - { name: event_subscriber }

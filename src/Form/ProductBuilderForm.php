@@ -4,6 +4,7 @@ namespace Drupal\product_builder\Form;
 
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
 
 /**
  * Form controller for Product builder edit forms.
@@ -45,6 +46,39 @@ class ProductBuilderForm extends ContentEntityForm {
         ]));
     }
     $form_state->setRedirect('entity.product_builder.canonical', ['product_builder' => $entity->id()]);
+  }
+
+  protected function actions(array $form, FormStateInterface $form_state) {
+    $actions = parent::actions($form, $form_state);
+
+    if ($this->operation == 'add') {
+      $actions['submit']['#value'] = $this->t('Save and add to the Cart');
+    }
+
+    return $actions;
+  }
+
+  /**
+   * Provides a generic edit title callback.
+   *
+   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+   *   The route match.
+   * @param \Drupal\Core\Entity\EntityInterface $_entity
+   *   (optional) An entity, passed in directly from the request attributes.
+   *
+   * @return string|null
+   *   The title for the entity edit page, if an entity was found.
+   */
+  function addProductBuilderTitle(RouteMatchInterface $route_match, $entity_type_id, $bundle_parameter) {
+    $variation_id = \Drupal::request()->query->get('variation_id');
+    if ($variation_id && ($variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id))) {
+      $product = $variation->getProduct();
+      return $this->t('Create your own @product', ['@product' => $product->getTitle()]);
+    }
+
+    $controller_resolver = \Drupal::service('controller_resolver');
+    $callable = $controller_resolver->getControllerFromDefinition('Drupal\Core\Entity\Controller\EntityController::addBundleTitle');
+    return call_user_func_array($callable, [$route_match, $entity_type_id, $bundle_parameter]);
   }
 
 }

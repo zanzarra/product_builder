@@ -1,0 +1,5 @@
+layout:
+  version: VERSION
+  css:
+    layout:
+      css/layout.css: {}
