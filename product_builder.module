@@ -219,6 +219,7 @@ function product_builder_commerce_add_to_cart($form, FormStateInterface $form_st
   $cart_manager->addOrderItem($cart, $order_item, FALSE);
 
   drupal_set_message(t('Product added to the cart.'));
+  $form_state->setRedirect('commerce_cart.page');
 }
 
 /**

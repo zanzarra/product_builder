@@ -39,7 +39,9 @@ function template_preprocess_product_builder_preview_element(&$variables) {
       continue;
     }
 
-    $variables[$variable_name] = $element["$variable_name"];
+    if (isset($element[$variable_name])) {
+      $variables[$variable_name] = $element[$variable_name];
+    }
   }
   $variables['state_variables'] = $element['#state_variables'];
 }
@@ -88,7 +90,7 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
       }
 
       if (isset($form[$variable_name])) {
-        $form['pb-preview']['product_builder_preview_element']["$variable_name"] = $form[$variable_name];
+        $form['pb-preview']['product_builder_preview_element'][$variable_name] = $form[$variable_name];
         unset($form[$variable_name]);
       }
     }
@@ -509,7 +511,9 @@ function product_builder_preview_entity_view(&$build, $entity, $display, $view_m
         continue;
       }
 
-      $build['builder_preview']["$variable_name"] = $form['pb-preview']['product_builder_preview_element']["$variable_name"];
+      if (isset($form['pb-preview']['product_builder_preview_element'][$variable_name])) {
+        $build['builder_preview'][$variable_name] = $form['pb-preview']['product_builder_preview_element'][$variable_name];
+      }
     }
   }
 }
