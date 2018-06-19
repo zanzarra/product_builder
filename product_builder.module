@@ -10,6 +10,7 @@ use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\product_builder\Event\ProductBuilderAddToCart;
 
 /**
  * Implements hook_help().
@@ -213,10 +214,27 @@ function product_builder_commerce_add_to_cart($form, FormStateInterface $form_st
     'unit_price' => $selected_variation->getPrice(),
     'product_builder_id' => $builder->id(),
   ));
-  $order_item->save();
 
+  //Add new order item to cart
   $cart_manager = \Drupal::service('commerce_cart.cart_manager');
   $cart_manager->addOrderItem($cart, $order_item, FALSE);
+
+  //Reload order item, because order item object doesn't have all actual values after calling addOrderItem method.
+  //And this order item is saved below.
+  //Add rule event for recalculating order item price.
+  $order_item = \Drupal::entityTypeManager()->getStorage('commerce_order_item')->load($order_item->id());
+  $event = new ProductBuilderAddToCart($order_item, ['order_item' => $order_item]);
+  $event_dispatcher = \Drupal::service('event_dispatcher');
+  $event_dispatcher->dispatch(ProductBuilderAddToCart::EVENT_NAME, $event);
+  //Disable price overriding for this order item
+  //Probably, there is sense to move line below into rule action class
+  $order_item->set('overridden_unit_price', 1);
+  $order_item->save();
+
+  //Recalculate order total price and save it
+  //It needs because order item unit price was recalculated
+  $cart->recalculateTotalPrice();
+  $cart->save();
 
   drupal_set_message(t('Product added to the cart.'));
   $form_state->setRedirect('commerce_cart.page');

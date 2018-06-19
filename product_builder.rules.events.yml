@@ -1,0 +1,7 @@
+rules_product_builder_add_to_cart:
+  label: 'Calculating Price for product builder'
+  category: 'Product Builder'
+  context:
+    order_item:
+      type: 'entity:commerce_order_item'
+      label: 'Commerce Order Item'
