@@ -6,9 +6,15 @@
   float: right;
   width: calc(100% - 300px - 4em);
 }
-#product-builder-preview .pizza-name {
-  margin: 0 auto .5em;
+.overlay-box {
+  position:relative;
 }
-#product-builder-preview .pizza-base {
-  margin: 0 auto .5em;
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 9999;
 }

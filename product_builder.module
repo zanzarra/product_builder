@@ -86,14 +86,44 @@ function product_builder_entity_base_field_info_alter(&$fields, \Drupal\Core\Ent
 }
 
 /**
+ * Implements hook_entity_extra_field_info().
+ */
+function product_builder_entity_extra_field_info() {
+  $extra = [];
+
+  $builder_types = \Drupal::entityTypeManager()->getStorage('product_builder_type')->loadMultiple();
+  foreach ($builder_types as $type) {
+    $extra['product_builder'][$type->id()]['form']['product_price'] = [
+      'label' => t('Product Price'),
+      'description' => t('Rendered Product Price'),
+      'weight' => 50,
+    ];
+    $extra['product_builder'][$type->id()]['form']['product'] = [
+      'label' => t('Product'),
+      'description' => t('Rendered Product'),
+      'weight' => 50,
+    ];
+  }
+
+  return $extra;
+}
+
+/**
  * Implements hook_form_alter().
  */
 function product_builder_form_alter(&$form, FormStateInterface &$form_state, $form_id) {
   $form_builder = $form_state->getBuildInfo();
   if (isset($form_builder['base_form_id']) && ($form_builder['base_form_id'] == 'product_builder_form')) {
+
+    $form_storage = $form_state->getStorage();
+
+    $builder = $form_state->getFormObject()->buildEntity($form, $form_state);
+    if (!$variation_id = product_builder_get_builder_commerce_item($builder->id())) {
+      $variation_id = \Drupal::request()->query->get('variation_id');
+    }
     //Add Attributes form to product builder form
     //See Class EntityFormDisplay method buildForm
-    if ($variation_id = \Drupal::request()->query->get('variation_id')) {
+    if ($variation_id && ($product_component = $form_storage['form_display']->getComponent('product'))) {
       $configuration = [
         'type' => 'commerce_product_variation_attributes',
         'weight' => 0,
@@ -155,16 +185,11 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       $items->filterEmptyItems();
       $form[$field_name] = $widget->form($items, $form, $form_state);
       $form[$field_name]['#access'] = $items->access('edit');
-
+      $form[$field_name]['#weight'] = $product_component['weight'];
       //Add data attribute for variation attributes fields.
       foreach (Element::children($form[$field_name]['widget'][0]['attributes']) as $key) {
         $form[$field_name]['widget'][0]['attributes'][$key]['#attributes']['data-variation-attribute'] = $key;
       }
-
-      // Assign the correct weight. This duplicates the reordering done in
-      // processForm(), but is needed for other forms calling this method
-      // directly.
-      $form[$field_name]['#weight'] = $configuration['weight'];
 
       // Associate the cache tags for the field definition & field storage
       // definition.
@@ -173,6 +198,33 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
 //    $this->renderer->addCacheableDependency($form[$configuration], $field_definition);
 //    $this->renderer->addCacheableDependency($form[$configuration], $field_definition->getFieldStorageDefinition());
 
+      //Calculated price according to rules
+      //@todo rework to resolver
+      $order_type_id = 'default';
+      $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($form_state->get('selected_variation'));
+      $order_item = \Drupal::entityTypeManager()->getStorage('commerce_order_item')->create(array(
+        'type' => $order_type_id,
+        'purchased_entity' => (string) $selected_variation->id(),
+        'quantity' => 1,
+        'unit_price' => $selected_variation->getPrice(),
+        'product_builder_id' => $builder,
+      ));
+      $event = new ProductBuilderAddToCart($order_item, ['order_item' => $order_item]);
+      $event_dispatcher = \Drupal::service('event_dispatcher');
+      $event_dispatcher->dispatch(ProductBuilderAddToCart::EVENT_NAME, $event);
+
+      if ($product_price_component = $form_storage['form_display']->getComponent('product_price')) {
+        $price = $order_item->getUnitPrice();
+        $currency = \Drupal::entityTypeManager()->getStorage('commerce_currency')->load($price->getCurrencyCode());
+        $form['price'] = [
+          '#theme' => 'commerce_price_plain',
+          '#number' => $price->getNumber(),
+          '#currency' => $currency,
+          '#prefix' => '<div id="product-builder-price">',
+          '#suffix' => '</div>',
+          '#weight' => $product_price_component['weight']
+        ];
+      }
       //Add custom submit to product builder add form
       $form['actions']['submit']['#submit'][] = 'product_builder_commerce_add_to_cart';
     }
@@ -212,7 +264,7 @@ function product_builder_commerce_add_to_cart($form, FormStateInterface $form_st
     'purchased_entity' => (string) $selected_variation->id(),
     'quantity' => 1,
     'unit_price' => $selected_variation->getPrice(),
-    'product_builder_id' => $builder->id(),
+    'product_builder_id' => $builder,
   ));
 
   //Add new order item to cart
