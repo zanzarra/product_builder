@@ -448,9 +448,8 @@ function product_builder_preview_get_twig_variable_names($nodes) {
  * Return product builder preview state variables.
  */
 function product_builder_preview_get_preview_state_variables($form_state) {
-  if (!$state_values = $form_state->getValues()) {
-    $state_values = $form_state->getUserInput();
-  }
+  $state_values = $form_state->getUserInput();
+  $state_values = array_merge($state_values, $form_state->getValues());
   $form_object = $form_state->getFormObject();
   $entity = $form_object->getEntity();
 
@@ -529,13 +528,6 @@ function product_builder_preview_get_field_cardinality($field_definition) {
 function product_builder_preview_entity_get_prepared_fields($entity, $state_values = FALSE) {
 
   foreach ($entity->getFields() as $name => $property) {
-    if ($name == 'type') {
-      continue;
-    }
-    //Product has reference to variation, variation has reference to product
-    if ($name == 'product_id') {
-      continue;
-    }
     $field_definition = $property->getFieldDefinition();
     $type = $field_definition->getType();
     $cardinality = product_builder_preview_get_field_cardinality($field_definition);
@@ -570,6 +562,7 @@ function product_builder_preview_entity_get_prepared_fields($entity, $state_valu
       $values[$name][0] = $template_variables->prepare('');
     }
 
+    \Drupal::moduleHandler()->alter('product_builder_prepared_fields', $values[$name], $property, $state_values);
   }
 
   return $values;
