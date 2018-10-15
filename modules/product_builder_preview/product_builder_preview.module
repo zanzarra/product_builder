@@ -12,6 +12,8 @@ use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\SettingsCommand;
 use Drupal\commerce_product\Plugin\Field\FieldWidget\ProductVariationAttributesWidget;
 use Drupal\Core\Entity\Entity\EntityViewDisplay;
+use Drupal\Core\Ajax\AfterCommand;
+use Drupal\Component\Utility\Html;
 
 /**
  * Implements hook_theme().
@@ -95,6 +97,8 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
       ],
       '#title' => t('Controls'),
       '#type' => 'fieldset',
+      '#prefix' => '<div id="product-builder-controls">',
+      '#suffix' => '</div>',
     ];
 
     $form['pb-preview'] = [
@@ -265,7 +269,12 @@ function product_builder_preview_add_ajax_callback_recursively($el, $callback, $
     'radios' => 'change',
     'checkboxes' => 'change',
     'checkbox' => 'change',
-    'commerce_product_rendered_attribute' => 'change'
+    'commerce_product_rendered_attribute' => 'change',
+    'number' => 'change'
+  ];
+
+  $process_ajax = [
+    'managed_file' => 'product_builder_preview_process_file_field_ajax_callback'
   ];
 
   foreach (Element::children($el) as $key) {
@@ -279,9 +288,19 @@ function product_builder_preview_add_ajax_callback_recursively($el, $callback, $
     }
 
     if (array_key_exists('#type', $el[$key]) && array_key_exists($el[$key]['#type'], $types_mapping)) {
+      if (!empty($el[$key]['#ajax']['callback'])) {
+        $el[$key]['#ajax']['options']['previous_callback'] = $el[$key]['#ajax']['callback'];
+      }
+
       $el[$key]['#ajax']['callback'] = $callback;
       $el[$key]['#ajax']['event'] = $types_mapping[$el[$key]['#type']];
       $el[$key]['#ajax']['disable-refocus'] = TRUE;
+      if (!isset($el[$key]['#ajax']['options']['query'])) {
+        $el[$key]['#ajax']['options']['query'] = [];
+      }
+    }
+    if (array_key_exists('#type', $el[$key]) && array_key_exists($el[$key]['#type'], $process_ajax)) {
+      $el[$key]['#process'][] = $process_ajax[$el[$key]['#type']];
     }
   }
 
@@ -289,29 +308,47 @@ function product_builder_preview_add_ajax_callback_recursively($el, $callback, $
 }
 
 /**
+ * Process managed_file field.
+ */
+function product_builder_preview_process_file_field_ajax_callback(&$element, FormStateInterface $form_state, &$complete_form)  {
+
+  $element['upload_button']['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+  $element['remove_button']['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
+
+  return $element;
+}
+
+/**
  * Ajax callback for refresh product builder preview.
  */
 function product_builder_preview_ajax_preview_rebuild_callback(array $form, FormStateInterface $form_state) {
-  $triggering_element = $form_state->getTriggeringElement();
-  if (isset($triggering_element['#attributes']['data-variation-attribute'])) {
-    $original_view_mode = $form_state->get('view_mode');
-    $form_state->set('view_mode', 'full');
-    //actual attachments are added inside this method
-    $ajax_response = ProductVariationAttributesWidget::ajaxRefresh($form, $form_state);
-    $form_state->get('view_mode', $original_view_mode);
-  }
-  else {
+  if ($triggering_element = $form_state->getTriggeringElement()) {
     $ajax_response = new AjaxResponse();
-    //Attach actual attachments
-    $attachments = product_builder_preview_get_form_attachments($form);
-    $ajax_response->setAttachments($attachments);
+
+    $triggering_element_data = [
+      'name' => $triggering_element['#name'],
+      'field' => FALSE
+    ];
+
+    $form_object = $form_state->getFormObject();
+    $entity = $form_object->getEntity();
+    $fields = $entity->getFields(TRUE);
+    if (isset($triggering_element['#parents'][0]) && isset($fields[$triggering_element['#parents'][0]])) {
+      $triggering_element_data['field'] = 'field--name-' . Html::getClass($triggering_element['#parents'][0]);
+    }
 
     $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['pb-preview']['product_builder_preview_element'])));
+    $ajax_response->addCommand(new ReplaceCommand('#product-builder-controls', \Drupal::service('renderer')->renderRoot($form['pb-controls'])));
+
+    $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data]));
+
+    $attachments = product_builder_preview_get_form_attachments($form);
+    $ajax_response->addAttachments($attachments);
+    $ajax_response->addAttachments($form['pb-preview']['product_builder_preview_element']['#attached']);
+    $ajax_response->addAttachments($form['pb-controls']['#attached']);
+
+    return $ajax_response;
   }
-
-  $ajax_response->addCommand(new ReplaceCommand('#product-builder-price', \Drupal::service('renderer')->renderRoot($form['pb-controls']['price'])));
-
-  return $ajax_response;
 }
 
 /**
