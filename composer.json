@@ -10,5 +10,7 @@
     "issues": "https://www.drupal.org/project/issues/product_builder",
     "source": "http://cgit.drupalcode.org/product_builder"
   },
-  "require": { }
+  "require": {
+    "drupal/commerce": "^2.8"
+  }
 }
