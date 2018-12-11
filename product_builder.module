@@ -187,8 +187,10 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       $form[$field_name]['#access'] = $items->access('edit');
       $form[$field_name]['#weight'] = $product_component['weight'];
       //Add data attribute for variation attributes fields.
-      foreach (Element::children($form[$field_name]['widget'][0]['attributes']) as $key) {
-        $form[$field_name]['widget'][0]['attributes'][$key]['#attributes']['data-variation-attribute'] = $key;
+      if (isset($form[$field_name]['widget'][0]['attributes']) && is_array($form[$field_name]['widget'][0]['attributes'])) {
+        foreach (Element::children($form[$field_name]['widget'][0]['attributes']) as $key) {
+          $form[$field_name]['widget'][0]['attributes'][$key]['#attributes']['data-variation-attribute'] = $key;
+        }
       }
 
       // Associate the cache tags for the field definition & field storage
@@ -201,7 +203,12 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       //Calculated price according to rules
       //@todo rework to resolver
       $order_type_id = 'default';
-      $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($form_state->get('selected_variation'));
+      if ($form_state->get('selected_variation')) {
+        $variation_id = $form_state->get('selected_variation');
+      }
+      $form_state->set('selected_variation', $variation_id);
+      $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
+
       $order_item = \Drupal::entityTypeManager()->getStorage('commerce_order_item')->create(array(
         'type' => $order_type_id,
         'purchased_entity' => (string) $selected_variation->id(),
