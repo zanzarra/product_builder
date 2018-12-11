@@ -123,7 +123,8 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
     }
     //Add Attributes form to product builder form
     //See Class EntityFormDisplay method buildForm
-    if ($variation_id && ($product_component = $form_storage['form_display']->getComponent('product'))) {
+    if ($variation_id && ($product_component = $form_storage['form_display']->getComponent('product')) && $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id)) {
+
       $configuration = [
         'type' => 'commerce_product_variation_attributes',
         'weight' => 0,
@@ -148,7 +149,6 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       ]);
 
       $order_item_storage = \Drupal::entityTypeManager()->getStorage('commerce_order_item');
-      $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
       $product = $variation->getProduct();
 
       //Set default variation id

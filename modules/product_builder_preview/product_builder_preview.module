@@ -452,6 +452,7 @@ function product_builder_preview_get_preview_state_variables($form_state) {
   $state_values = array_merge($state_values, $form_state->getValues());
   $form_object = $form_state->getFormObject();
   $entity = $form_object->getEntity();
+  $state_values['form_state'] = $form_state;
 
   $prepared_values = product_builder_preview_entity_get_prepared_fields($entity, $state_values);
 

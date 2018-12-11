@@ -18,6 +18,10 @@ class ImageVariables extends BuilderVariablesPluginBase {
    * {@inheritdoc}
    */
   public function prepare($value) {
+    if(!isset($value['target_id'])) {
+      return '';
+    }
+
     if (!$value || !$image = \Drupal::entityTypeManager()->getStorage('file')->load($value['target_id'])) {
       return parent::prepare($value);
     }
