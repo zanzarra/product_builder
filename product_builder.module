@@ -47,8 +47,8 @@ function product_builder_theme() {
 }
 
 /**
-* Implements hook_theme_suggestions_HOOK().
-*/
+ * Implements hook_theme_suggestions_HOOK().
+ */
 function product_builder_theme_suggestions_product_builder(array $variables) {
   $suggestions = [];
   $entity = $variables['elements']['#product_builder'];
@@ -98,9 +98,16 @@ function product_builder_entity_extra_field_info() {
       'description' => t('Rendered Product Price'),
       'weight' => 50,
     ];
-    $extra['product_builder'][$type->id()]['form']['product'] = [
+    $extra['product_builder'][$type->id()]['form']['purchased_entity'] = [
       'label' => t('Product'),
       'description' => t('Rendered Product'),
+      'weight' => 50,
+    ];
+    // Using this extra field, we can manage the 'actions' container position.
+    // Now it can be placed inside of the field_group, which is important in some cases.
+    $extra['product_builder'][$type->id()]['form']['actions'] = [
+      'label' => t('Actions'),
+      'description' => t('Form actions container'),
       'weight' => 50,
     ];
   }
@@ -123,7 +130,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
     }
     //Add Attributes form to product builder form
     //See Class EntityFormDisplay method buildForm
-    if ($variation_id && ($product_component = $form_storage['form_display']->getComponent('product')) && $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id)) {
+    if ($variation_id && ($product_component = $form_storage['form_display']->getComponent('purchased_entity')) && $variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id)) {
 
       $configuration = [
         'type' => 'commerce_product_variation_attributes',
@@ -186,6 +193,8 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       $form[$field_name] = $widget->form($items, $form, $form_state);
       $form[$field_name]['#access'] = $items->access('edit');
       $form[$field_name]['#weight'] = $product_component['weight'];
+      $form[$field_name]['#process'][] = ['Drupal\Core\Render\Element\RenderElement', 'processGroup'];
+      $form[$field_name]['#pre_render'][] = ['Drupal\Core\Render\Element\RenderElement', 'preRenderGroup'];
       //Add data attribute for variation attributes fields.
       if (isset($form[$field_name]['widget'][0]['attributes']) && is_array($form[$field_name]['widget'][0]['attributes'])) {
         foreach (Element::children($form[$field_name]['widget'][0]['attributes']) as $key) {
@@ -223,17 +232,28 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       if ($product_price_component = $form_storage['form_display']->getComponent('product_price')) {
         $price = $order_item->getUnitPrice();
         $currency = \Drupal::entityTypeManager()->getStorage('commerce_currency')->load($price->getCurrencyCode());
-        $form['price'] = [
+        $form['product_price'] = [
           '#theme' => 'commerce_price_plain',
           '#number' => $price->getNumber(),
           '#currency' => $currency,
           '#prefix' => '<div id="product-builder-price">',
           '#suffix' => '</div>',
-          '#weight' => $product_price_component['weight']
+          '#weight' => $product_price_component['weight'],
+          '#process' => [
+            ['Drupal\Core\Render\Element\RenderElement', 'processGroup']
+          ],
+          '#pre_render' => [
+            ['Drupal\Core\Render\Element\RenderElement', 'preRenderGroup']
+          ],
         ];
       }
       //Add custom submit to product builder add form
       $form['actions']['submit']['#submit'][] = 'product_builder_commerce_add_to_cart';
+      if ($actions_component = $form_storage['form_display']->getComponent('actions')) {
+        $form['actions']['#weight'] = $actions_component['weight'];
+        $form['actions']['#process'][] = ['Drupal\Core\Render\Element\RenderElement', 'processGroup'];
+        $form['actions']['#pre_render'][] = ['Drupal\Core\Render\Element\RenderElement', 'preRenderGroup'];
+      }
     }
   }
 }

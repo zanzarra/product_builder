@@ -87,53 +87,39 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
     $suggestions = product_builder_preview_suggestions_list($entity);
     $template_file = product_builder_preview_get_suggestion_template($suggestions);
     $template_variables = product_builder_preview_get_template_variables($template_file);
+    $form_storage = $form_state->getStorage();
 
-    $form['pb-controls'] = [
-      '#attached' => [
-        'library' => ['product_builder_preview/layout'],
-      ],
-      '#attributes' => [
-        'class' => ['product-builder-controls'],
-      ],
-      '#title' => t('Controls'),
-      '#type' => 'fieldset',
-      '#prefix' => '<div id="product-builder-controls">',
-      '#suffix' => '</div>',
-    ];
+    if ($preview_component = $form_storage['form_display']->getComponent('builder_preview')) {
 
-    $form['pb-preview'] = [
-      '#attributes' => [
-        'class' => ['product-builder-preview'],
-      ],
-      '#title' => t('Preview'),
-      '#type' => 'fieldset',
-    ];
-
-    $form['pb-preview']['product_builder_preview_element'] = [
-      '#theme' => 'product_builder_preview_element',
-      '#weight' => 100,
-      '#state_variables' => product_builder_preview_get_preview_state_variables($form_state),
-      '#product_builder' => $entity,
-      '#prefix' => '<div id="product-builder-preview">',
-      '#suffix' => '</div>',
-    ];
+      $form['builder_preview'] = [
+        '#theme' => 'product_builder_preview_element',
+        '#weight' => $preview_component['weight'],
+        '#process' => [
+          ['Drupal\Core\Render\Element\RenderElement', 'processGroup']
+        ],
+        '#pre_render' => [
+          ['Drupal\Core\Render\Element\RenderElement', 'preRenderGroup']
+        ],
+        // Need this option to trick the field_group module.
+        // Without this option, field_group may be treated like empty and therefore skipped rendering.
+        // @see field_group.module:743
+        '#markup' => '',
+        '#state_variables' => product_builder_preview_get_preview_state_variables($form_state),
+        '#product_builder' => $entity,
+        '#prefix' => '<div id="product-builder-preview">',
+        '#suffix' => '</div>',
+      ];
+    }
 
     foreach ($template_variables as $variable_name) {
       if (strpos($variable_name, 'state_variables') !== FALSE) {
         continue;
       }
 
-      if (isset($form[$variable_name])) {
-        $form['pb-preview']['product_builder_preview_element'][$variable_name] = $form[$variable_name];
-        unset($form[$variable_name]);
-      }
-    }
-
-    foreach (Element::children($form) as $child) {
-      if (($child != 'pb-controls') && ($child != 'pb-preview')) {
-        $form['pb-controls'][$child] = $form[$child];
-        unset($form[$child]);
-      }
+        if (isset($form[$variable_name])) {
+          $form['builder_preview'][$variable_name] = $form[$variable_name];
+          unset($form[$variable_name]);
+        }
     }
 
     $product_builder_type = \Drupal::entityTypeManager()->getStorage('product_builder_type')->load($entity->bundle());
@@ -337,15 +323,16 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
       $triggering_element_data['field'] = 'field--name-' . Html::getClass($triggering_element['#parents'][0]);
     }
 
-    $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', \Drupal::service('renderer')->renderRoot($form['pb-preview']['product_builder_preview_element'])));
-    $ajax_response->addCommand(new ReplaceCommand('#product-builder-controls', \Drupal::service('renderer')->renderRoot($form['pb-controls'])));
+    unset($form['builder_preview']['#process']);
+    unset($form['builder_preview']['#pre_render']);
+    $preview = \Drupal::service('renderer')->renderRoot($form['builder_preview']);
+    $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', $preview));
 
     $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data]));
 
     $attachments = product_builder_preview_get_form_attachments($form);
     $ajax_response->addAttachments($attachments);
-    $ajax_response->addAttachments($form['pb-preview']['product_builder_preview_element']['#attached']);
-    $ajax_response->addAttachments($form['pb-controls']['#attached']);
+    $ajax_response->addAttachments($form['builder_preview']['#attached']);
 
     return $ajax_response;
   }
@@ -578,6 +565,11 @@ function product_builder_preview_entity_extra_field_info() {
   $builder_types = \Drupal::entityTypeManager()->getStorage('product_builder_type')->loadMultiple();
   foreach ($builder_types as $type) {
     $extra['product_builder'][$type->id()]['display']['builder_preview'] = [
+      'label' => t('Builder Preview'),
+      'description' => t('Rendered Product Builder'),
+      'weight' => 50,
+    ];
+    $extra['product_builder'][$type->id()]['form']['builder_preview'] = [
       'label' => t('Builder Preview'),
       'description' => t('Rendered Product Builder'),
       'weight' => 50,
