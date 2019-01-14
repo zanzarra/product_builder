@@ -326,7 +326,9 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
     unset($form['builder_preview']['#process']);
     unset($form['builder_preview']['#pre_render']);
     $preview = \Drupal::service('renderer')->renderRoot($form['builder_preview']);
+    $price = \Drupal::service('renderer')->renderRoot($form['product_price']);
     $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', $preview));
+    $ajax_response->addCommand(new ReplaceCommand('#product-builder-price', $price));
 
     $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data]));
 
