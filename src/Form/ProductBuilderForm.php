@@ -53,6 +53,16 @@ class ProductBuilderForm extends ContentEntityForm {
 
     if ($this->operation == 'add') {
       $actions['submit']['#value'] = $this->t('Save and add to the Cart');
+      $storage = $form_state->getStorage();
+      //Change button name for Embed formatter.
+      if ($storage['builder_type'] == 'embed') {
+        $builder_bundle = $storage['builder_bundle'];
+        $button_text = $storage['builder_button_text'];
+        $builder_bundles = \Drupal::service('entity_type.bundle.info')->getBundleInfo('product_builder');
+        $bundle_label = $builder_bundles[$builder_bundle]['label'];
+        $button_text = t($button_text, array('@bundle' => $bundle_label));
+        $actions['submit']['#value'] = $button_text;
+      }
     }
 
     return $actions;

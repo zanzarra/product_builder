@@ -127,6 +127,9 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
     $builder = $form_state->getFormObject()->buildEntity($form, $form_state);
     if (!$variation_id = product_builder_get_builder_commerce_item($builder->id())) {
       $variation_id = \Drupal::request()->query->get('variation_id');
+      if (!isset($variation_id) && isset($form_storage['product'])) {
+        $variation_id = $form_storage['product']->getVariationIds()[0];
+      }
     }
     //Add Attributes form to product builder form
     //See Class EntityFormDisplay method buildForm
@@ -247,6 +250,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
           ],
         ];
       }
+
       //Add custom submit to product builder add form
       $form['actions']['submit']['#submit'][] = 'product_builder_commerce_add_to_cart';
       if ($actions_component = $form_storage['form_display']->getComponent('actions')) {

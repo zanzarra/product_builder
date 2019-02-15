@@ -204,8 +204,11 @@ function product_builder_preview_get_builder_variation_type($bundle) {
   $product_types = \Drupal::service('entity.manager')->getStorage('commerce_product_type')->loadMultiple();
   foreach ($product_types as $name => $product_type) {
     $variations_formatter = EntityViewDisplay::load('commerce_product.' . $name . '.default')->getRenderer('variations');
-    if (($variations_formatter->getPluginId() == 'product_builder_add_to_cart') && ($variations_formatter->getSetting('builder_bundle') == $bundle)) {
-      return $product_type->getVariationTypeId();
+    if ($variations_formatter !== NULL) {
+      $plugin_id = $variations_formatter->getPluginId();
+      if (($plugin_id == 'product_builder_add_to_cart' || $plugin_id == 'embed_product_builder_add_to_cart') && ($variations_formatter->getSetting('builder_bundle') == $bundle)) {
+        return $product_type->getVariationTypeId();
+      }
     }
   }
 
