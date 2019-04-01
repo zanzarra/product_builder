@@ -43,7 +43,6 @@ function product_builder_preview_theme_suggestions_product_builder_preview_eleme
  */
 function template_preprocess_product_builder_preview_element(&$variables) {
   $element = $variables['element'];
-
   $suggestions = product_builder_preview_suggestions_list($variables['element']['#product_builder']);
   $template_file = product_builder_preview_get_suggestion_template($suggestions);
   $template_variables = product_builder_preview_get_template_variables($template_file);
@@ -78,11 +77,12 @@ function product_builder_preview_views_data_alter(&$data) {
 /**
  * Implements hook_form_alter().
  */
-function product_builder_preview_form_alter(&$form, FormStateInterface &$form_state, $form_id) {
+function product_builder_preview_form_alter(array &$form, FormStateInterface &$form_state, $form_id) {
   $form_builder = $form_state->getBuildInfo();
   if (isset($form_builder['base_form_id']) && ($form_builder['base_form_id'] == 'product_builder_form')) {
     $form['#attributes']['autocomplete'] = 'off';
 
+    $product = $form_state->get('product');
     $entity = $form_state->getFormObject()->getEntity();
     $suggestions = product_builder_preview_suggestions_list($entity);
     $template_file = product_builder_preview_get_suggestion_template($suggestions);
@@ -90,7 +90,6 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
     $form_storage = $form_state->getStorage();
 
     if ($preview_component = $form_storage['form_display']->getComponent('builder_preview')) {
-
       $form['builder_preview'] = [
         '#theme' => 'product_builder_preview_element',
         '#weight' => $preview_component['weight'],
@@ -116,10 +115,10 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
         continue;
       }
 
-        if (isset($form[$variable_name])) {
-          $form['builder_preview'][$variable_name] = $form[$variable_name];
-          unset($form[$variable_name]);
-        }
+      if (isset($form[$variable_name])) {
+        $form['builder_preview'][$variable_name] = $form[$variable_name];
+        unset($form[$variable_name]);
+      }
     }
 
     $product_builder_type = \Drupal::entityTypeManager()->getStorage('product_builder_type')->load($entity->bundle());
@@ -127,9 +126,13 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
 
     // Hardcoded AJAX callback for one textfield form.
     $form = product_builder_preview_add_ajax_callback_recursively($form, 'product_builder_preview_ajax_preview_rebuild_callback', $ajax_settings);
+
+    // Add custom class to product variation wrapper. In further that class
+    // uses for attributes update.
+    $form['purchased_entity']['#attributes']['class'][] = "product_builder_purchased_entity_product_{$product->id()}_wrapper";
   }
 
-  //Added template variables list
+  // Added template variables list.
   if (($form_id == 'entity_form_display_edit_form') || ($form_id == 'entity_view_display_edit_form')) {
     $entity = $form_builder['callback_object']->getEntity();
     $entity_type = $entity->getTargetEntityTypeId();
@@ -156,6 +159,7 @@ function product_builder_preview_form_alter(&$form, FormStateInterface &$form_st
       ];
     }
   }
+
   if ($form_id == 'entity_form_display_edit_form') {
     $form_entity = $form_state->getFormObject()->getEntity();
     if ($form_entity->getTargetEntityTypeId() === 'product_builder') {
@@ -300,7 +304,6 @@ function product_builder_preview_add_ajax_callback_recursively($el, $callback, $
  * Process managed_file field.
  */
 function product_builder_preview_process_file_field_ajax_callback(&$element, FormStateInterface $form_state, &$complete_form)  {
-
   $element['upload_button']['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
   $element['remove_button']['#ajax']['callback'] = 'product_builder_preview_ajax_preview_rebuild_callback';
 
@@ -319,6 +322,7 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
       'field' => FALSE
     ];
 
+    $product = $form_state->get('product');
     $form_object = $form_state->getFormObject();
     $entity = $form_object->getEntity();
     $fields = $entity->getFields(TRUE);
@@ -332,6 +336,10 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
     $price = \Drupal::service('renderer')->renderRoot($form['product_price']);
     $ajax_response->addCommand(new ReplaceCommand('#product-builder-preview', $preview));
     $ajax_response->addCommand(new ReplaceCommand('#product-builder-price', $price));
+    $ajax_response->addCommand(new ReplaceCommand(
+      ".product_builder_purchased_entity_product_{$product->id()}_wrapper",
+      $form['purchased_entity']
+    ));
 
     $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data]));
 
@@ -372,7 +380,6 @@ function product_builder_preview_suggestions_list($entity) {
  * Get templates variables for template.
  */
 function product_builder_preview_get_template_variables($template_file) {
-
   $variables = &drupal_static(__FUNCTION__, []);
 
   if (isset($variables[$template_file])) {
@@ -519,7 +526,6 @@ function product_builder_preview_get_field_cardinality($field_definition) {
  * Prepare fields for entity. This data send to template.
  */
 function product_builder_preview_entity_get_prepared_fields($entity, $state_values = FALSE) {
-
   foreach ($entity->getFields() as $name => $property) {
     $field_definition = $property->getFieldDefinition();
     $type = $field_definition->getType();
@@ -566,8 +572,8 @@ function product_builder_preview_entity_get_prepared_fields($entity, $state_valu
  */
 function product_builder_preview_entity_extra_field_info() {
   $extra = [];
-
   $builder_types = \Drupal::entityTypeManager()->getStorage('product_builder_type')->loadMultiple();
+
   foreach ($builder_types as $type) {
     $extra['product_builder'][$type->id()]['display']['builder_preview'] = [
       'label' => t('Builder Preview'),
@@ -604,7 +610,6 @@ function product_builder_preview_entity_view(&$build, $entity, $display, $view_m
  */
 function product_builder_preview_element_build($entity) {
   $build = [];
-
   $prepared_values = product_builder_preview_entity_get_prepared_fields($entity);
 
   if ($variation_id = product_builder_get_builder_commerce_item($entity->id())) {
