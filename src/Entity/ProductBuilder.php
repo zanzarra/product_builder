@@ -27,6 +27,7 @@ use Drupal\user\UserInterface;
  *     "form" = {
  *       "default" = "Drupal\product_builder\Form\ProductBuilderForm",
  *       "add" = "Drupal\product_builder\Form\ProductBuilderForm",
+ *       "buy_now_or_customize_and_buy" = "Drupal\product_builder\Form\ProductBuilderForm",
  *       "edit" = "Drupal\product_builder\Form\ProductBuilderForm",
  *       "delete" = "Drupal\product_builder\Form\ProductBuilderDeleteForm",
  *     },

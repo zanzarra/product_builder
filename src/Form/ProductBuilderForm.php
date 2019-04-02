@@ -2,8 +2,8 @@
 
 namespace Drupal\product_builder\Form;
 
-use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Routing\RouteMatchInterface;
 
 /**
@@ -20,8 +20,6 @@ class ProductBuilderForm extends ContentEntityForm {
     /* @var $entity \Drupal\product_builder\Entity\ProductBuilder */
     $form = parent::buildForm($form, $form_state);
 
-    $entity = $this->entity;
-
     return $form;
   }
 
@@ -30,7 +28,6 @@ class ProductBuilderForm extends ContentEntityForm {
    */
   public function save(array $form, FormStateInterface $form_state) {
     $entity = $this->entity;
-
     $status = parent::save($form, $form_state);
 
     switch ($status) {
@@ -48,20 +45,34 @@ class ProductBuilderForm extends ContentEntityForm {
     $form_state->setRedirect('entity.product_builder.canonical', ['product_builder' => $entity->id()]);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function actions(array $form, FormStateInterface $form_state) {
     $actions = parent::actions($form, $form_state);
+    $actions['submit']['#value'] = $this->t('Save and add to the Cart');
+    $storage = $form_state->getStorage();
 
-    if ($this->operation == 'add') {
-      $actions['submit']['#value'] = $this->t('Save and add to the Cart');
-      $storage = $form_state->getStorage();
-      //Change button name for Embed formatter.
-      if (isset($storage['builder_type']) && $storage['builder_type'] == 'embed') {
-        $builder_bundle = $storage['builder_bundle'];
-        $button_text = $storage['builder_button_text'];
-        $builder_bundles = \Drupal::service('entity_type.bundle.info')->getBundleInfo('product_builder');
-        $bundle_label = $builder_bundles[$builder_bundle]['label'];
-        $button_text = t($button_text, array('@bundle' => $bundle_label));
-        $actions['submit']['#value'] = $button_text;
+    if (isset($storage['builder_type']) && $this->operation == 'add' || $this->operation == 'buy_now_or_customize_and_buy') {
+      $builder_bundle = $storage['builder_bundle'];
+      $button_text = $storage['builder_button_text'];
+      $builder_bundles = \Drupal::service('entity_type.bundle.info')->getBundleInfo('product_builder');
+      $bundle_label = $builder_bundles[$builder_bundle]['label'];
+
+      switch ($storage['builder_type']) {
+        case 'add_or_customize':
+          $actions['builder_redirect'] = [
+            '#type' => 'submit',
+            '#value' => $button_text,
+            '#submit' => ['product_builder_add_to_cart_builder_form_redirect'],
+            '#weight' => 100,
+          ];
+          break;
+
+        case 'embed_customization':
+          $button_text = $this->t($button_text, ['@bundle' => $bundle_label]);
+          $actions['submit']['#value'] = $button_text;
+          break;
       }
     }
 

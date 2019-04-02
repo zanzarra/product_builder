@@ -1,10 +1,6 @@
 services:
-  product_builder.add_to_cart_lazy_builders:
-    class: Drupal\product_builder\AddToCartProductBuilderLazyBuilders
-    arguments: ['@entity_type.manager', '@form_builder', '@entity.repository']
-
-  product_builder.embed_product_builder_lazy_builders:
-    class: Drupal\product_builder\EmbedProductBuilderLazyBuilders
+  product_builder.product_builder_lazy_builders:
+    class: Drupal\product_builder\ProductBuilderLazyBuilders
     arguments: ['@entity_type.manager', '@form_builder', '@entity.repository']
 
   product_builder.route_subscriber:

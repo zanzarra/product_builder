@@ -63,13 +63,6 @@ function product_builder_theme_suggestions_product_builder(array $variables) {
 }
 
 /**
- * Implements hook_entity_type_build().
- */
-function product_builder_entity_type_build(array &$entity_types) {
-  $entity_types['commerce_order_item']->setFormClass('add_to_cart_product_builder', '\Drupal\product_builder\Form\AddToCartProductBuilderForm');
-}
-
-/**
  * Implements hook_entity_base_field_info_alter().
  */
 function product_builder_entity_base_field_info_alter(&$fields, \Drupal\Core\Entity\EntityTypeInterface $entity_type) {
@@ -267,7 +260,6 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
  * class ProductVariationAttributesWidget method selectVariationFromUserInput
  */
 function product_builder_commerce_add_to_cart($form, FormStateInterface $form_state) {
-
   $product = $form_state->get('product');
   $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($form_state->get('selected_variation'));
 
@@ -326,14 +318,16 @@ function product_builder_commerce_add_to_cart($form, FormStateInterface $form_st
 /**
  * Redirect to product builder add form.
  */
-function product_builder_add_to_cart_builder_form_redirect($form, FormStateInterface $form_state) {
-
+function product_builder_add_to_cart_builder_form_redirect(array $form, FormStateInterface $form_state) {
   $storage = $form_state->getStorage();
   $builder_bundle = $storage['builder_bundle'];
   $values = $form_state->getValues();
   $variation_id = $values['purchased_entity'][0]['variation'];
 
-  $form_state->setRedirect('entity.product_builder.add_form', ['product_builder_type' => $builder_bundle], ['query' => ['variation_id' => $variation_id]]);
+  $form_state->setRedirect('entity.product_builder.add_form',
+    ['product_builder_type' => $builder_bundle,],
+    ['query' => ['variation_id' => $variation_id]]
+  );
   return;
 }
 

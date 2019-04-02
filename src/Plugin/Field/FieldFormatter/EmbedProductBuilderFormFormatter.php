@@ -2,12 +2,12 @@
 
 namespace Drupal\product_builder\Plugin\Field\FieldFormatter;
 
-use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\commerce_product\Plugin\Field\FieldFormatter\AddToCartFormatter;
 
 /**
- * Plugin implementation of the 'commerce_add_to_cart' formatter.
+ * Plugin implementation of the 'embed_product_builder_add_to_cart' formatter.
  *
  * @FieldFormatter(
  *   id = "embed_product_builder_add_to_cart",
@@ -62,19 +62,19 @@ class EmbedProductBuilderFormFormatter extends AddToCartFormatter {
    * {@inheritdoc}
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
-
     $builder_bundle = $this->getSetting('builder_bundle');
     $label = $this->getSetting('builder_text');
     $elements = [];
     $elements[0]['add_to_cart_form'] = [
       '#lazy_builder' => [
-        'product_builder.embed_product_builder_lazy_builders:addToCartForm', [
+        'product_builder.product_builder_lazy_builders:addToCartForm', [
           $items->getEntity()->id(),
           $this->viewMode,
           $this->getSetting('combine'),
           $langcode,
           $builder_bundle,
           $label,
+          'embed_customization'
         ],
       ],
       '#create_placeholder' => TRUE,

@@ -1,0 +1,10 @@
+uuid: b2fa4e0c-9be4-4f45-8642-0c57a761713a
+langcode: en
+status: true
+dependencies:
+  module:
+    - product_builder
+id: product_builder.buy_now_or_customize_and_buy
+label: 'Buy now or customize and buy'
+targetEntityType: product_builder
+cache: true
