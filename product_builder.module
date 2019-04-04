@@ -228,7 +228,10 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
         'unit_price' => $selected_variation->getPrice(),
         'product_builder_id' => $builder,
       ));
-      $event = new ProductBuilderAddToCart($order_item, ['order_item' => $order_item]);
+
+      // Set the order item twice on the event: as the main subject but also in the
+      // list of arguments.
+      $event = new ProductBuilderAddToCart($order_item, $form_state, ['order_item' => $order_item]);
       $event_dispatcher = \Drupal::service('event_dispatcher');
       $event_dispatcher->dispatch(ProductBuilderAddToCart::EVENT_NAME, $event);
 
@@ -251,7 +254,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
         ];
       }
 
-      //Add custom submit to product builder add form
+      // Add custom submit to product builder add form.
       $form['actions']['submit']['#submit'][] = 'product_builder_commerce_add_to_cart';
       if ($actions_component = $form_storage['form_display']->getComponent('actions')) {
         $form['actions']['#weight'] = $actions_component['weight'];
@@ -266,8 +269,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
  * Add commerce order item to cart after create new builder entity.
  * class ProductVariationAttributesWidget method selectVariationFromUserInput
  */
-function product_builder_commerce_add_to_cart($form, FormStateInterface $form_state) {
-
+function product_builder_commerce_add_to_cart(array $form, FormStateInterface $form_state) {
   $product = $form_state->get('product');
   $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($form_state->get('selected_variation'));
 
@@ -306,9 +308,10 @@ function product_builder_commerce_add_to_cart($form, FormStateInterface $form_st
   //And this order item is saved below.
   //Add rule event for recalculating order item price.
   $order_item = \Drupal::entityTypeManager()->getStorage('commerce_order_item')->load($order_item->id());
-  $event = new ProductBuilderAddToCart($order_item, ['order_item' => $order_item]);
+  $event = new ProductBuilderAddToCart($order_item, $form_state, ['order_item' => $order_item]);
   $event_dispatcher = \Drupal::service('event_dispatcher');
   $event_dispatcher->dispatch(ProductBuilderAddToCart::EVENT_NAME, $event);
+
   //Disable price overriding for this order item
   //Probably, there is sense to move line below into rule action class
   $order_item->set('overridden_unit_price', 1);
