@@ -11,3 +11,8 @@ services:
     class: Drupal\product_builder\Routing\RouteSubscriber
     tags:
       - { name: event_subscriber }
+
+  product_builder.add_to_cart_subscriber:
+    class: Drupal\product_builder\EventSubscriber\ProductBuilderAddToCartEventSubscriber
+    tags:
+      - { name: event_subscriber }

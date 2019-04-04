@@ -93,6 +93,12 @@ function product_builder_entity_extra_field_info() {
 
   $builder_types = \Drupal::entityTypeManager()->getStorage('product_builder_type')->loadMultiple();
   foreach ($builder_types as $type) {
+    $extra['product_builder'][$type->id()]['form']['product_quantity'] = [
+      'label' => t('Product quantity'),
+      'description' => t('Rendered Product Quantity'),
+      'weight' => 50,
+      'visible' => FALSE,
+    ];
     $extra['product_builder'][$type->id()]['form']['product_price'] = [
       'label' => t('Product Price'),
       'description' => t('Rendered Product Price'),
@@ -118,7 +124,7 @@ function product_builder_entity_extra_field_info() {
 /**
  * Implements hook_form_alter().
  */
-function product_builder_form_alter(&$form, FormStateInterface &$form_state, $form_id) {
+function product_builder_form_alter(array &$form, FormStateInterface &$form_state, $form_id) {
   $form_builder = $form_state->getBuildInfo();
   if (isset($form_builder['base_form_id']) && ($form_builder['base_form_id'] == 'product_builder_form')) {
 
@@ -145,11 +151,12 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
 
       $field_name = 'purchased_entity';
       $field_manager = \Drupal::service('entity_field.manager');
+      $widget_manager = \Drupal::service('plugin.manager.field.widget');
+      $entity_type_manager = \Drupal::service('entity_type.manager');
 
       $definitions = $field_manager->getFieldDefinitions('commerce_order_item', 'default');
       $field_definition = $definitions[$field_name];
 
-      $widget_manager = \Drupal::service('plugin.manager.field.widget');
       $widget = $widget_manager->getInstance([
         'field_definition' => $field_definition,
         'form_mode' => 'add_to_cart',
@@ -158,7 +165,7 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
         'configuration' => $configuration
       ]);
 
-      $order_item_storage = \Drupal::entityTypeManager()->getStorage('commerce_order_item');
+      $order_item_storage = $entity_type_manager->getStorage('commerce_order_item');
       $product = $variation->getProduct();
 
       //Set default variation id
@@ -219,15 +226,15 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
         $variation_id = $form_state->get('selected_variation');
       }
       $form_state->set('selected_variation', $variation_id);
-      $selected_variation = \Drupal::entityTypeManager()->getStorage('commerce_product_variation')->load($variation_id);
+      $selected_variation = $entity_type_manager->getStorage('commerce_product_variation')->load($variation_id);
 
-      $order_item = \Drupal::entityTypeManager()->getStorage('commerce_order_item')->create(array(
+      $order_item = $entity_type_manager->getStorage('commerce_order_item')->create([
         'type' => $order_type_id,
         'purchased_entity' => (string) $selected_variation->id(),
         'quantity' => 1,
         'unit_price' => $selected_variation->getPrice(),
         'product_builder_id' => $builder,
-      ));
+      ]);
 
       // Set the order item twice on the event: as the main subject but also in the
       // list of arguments.
@@ -236,8 +243,11 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
       $event_dispatcher->dispatch(ProductBuilderAddToCart::EVENT_NAME, $event);
 
       if ($product_price_component = $form_storage['form_display']->getComponent('product_price')) {
-        $price = $order_item->getUnitPrice();
-        $currency = \Drupal::entityTypeManager()->getStorage('commerce_currency')->load($price->getCurrencyCode());
+        $price = $order_item->getTotalPrice();
+        if (!$price) {
+          $price = $order_item->getUnitPrice();
+        }
+        $currency = $entity_type_manager->getStorage('commerce_currency')->load($price->getCurrencyCode());
         $form['product_price'] = [
           '#theme' => 'commerce_price_plain',
           '#number' => $price->getNumber(),
@@ -251,6 +261,18 @@ function product_builder_form_alter(&$form, FormStateInterface &$form_state, $fo
           '#pre_render' => [
             ['Drupal\Core\Render\Element\RenderElement', 'preRenderGroup']
           ],
+        ];
+      }
+
+      if ($product_quantity_component = $form_storage['form_display']->getComponent('product_quantity')) {
+        $form['product_quantity'] = [
+          '#title' => t('Quantity'),
+          '#type' => 'number',
+          '#min' => 1,
+          '#size' => 4,
+          '#step' => 1,
+          '#weight' => $product_quantity_component['weight'],
+          '#default_value' => 1,
         ];
       }
 
