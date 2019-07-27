@@ -26,6 +26,10 @@ class ImageVariables extends BuilderVariablesPluginBase {
       return file_create_url($image->getFileUri());
     }
 
+    if ($value && isset($value['fids']) && $image = \Drupal::entityTypeManager()->getStorage('file')->load($value['fids'])) {
+      return file_create_url($image->getFileUri());
+    }
+
     return parent::prepare($value);
   }
 
