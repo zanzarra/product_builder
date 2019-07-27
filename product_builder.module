@@ -344,7 +344,6 @@ function product_builder_commerce_add_to_cart(array $form, FormStateInterface $f
   $cart->recalculateTotalPrice();
   $cart->save();
 
-  drupal_set_message(t('Product added to the cart.'));
   $form_state->setRedirect('commerce_cart.page');
 }
 
