@@ -341,7 +341,7 @@ function product_builder_preview_ajax_preview_rebuild_callback(array $form, Form
       $form['purchased_entity']
     ));
 
-    $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data]));
+    $ajax_response->addCommand(new SettingsCommand(['triggering_element_data' => $triggering_element_data], TRUE));
 
     $attachments = product_builder_preview_get_form_attachments($form);
     $ajax_response->addAttachments($attachments);
